@@ -59,6 +59,14 @@ namespace Microsoft.AspNetCore.Mvc.Infrastructure
 
             var request = context.HttpContext.Request;
             var httpRequestHeaders = request.GetTypedHeaders();
+
+            // Since the 'Last-Modified' and other similar http date headers are rounded off to whole seconds,
+            // round off current file's last modified to whole seconds for correct comparison.
+            if (lastModified.HasValue)
+            {
+                lastModified = RoundOffToWholeSeconds(lastModified.Value);
+            }
+
             var preconditionState = GetPreconditionState(httpRequestHeaders, lastModified, etag);
 
             var response = context.HttpContext.Response;
@@ -219,7 +227,7 @@ namespace Microsoft.AspNetCore.Mvc.Infrastructure
                     matchNotFoundState: PreconditionState.ShouldProcess);
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = RoundOffToWholeSeconds(DateTimeOffset.UtcNow);
 
             // 14.25 If-Modified-Since
             var ifModifiedSince = httpRequestHeaders.IfModifiedSince;
@@ -374,6 +382,12 @@ namespace Microsoft.AspNetCore.Mvc.Infrastructure
                     context.Abort();
                 }
             }
+        }
+
+        private static DateTimeOffset RoundOffToWholeSeconds(DateTimeOffset dateTimeOffset)
+        {
+            var ticksToRemove = dateTimeOffset.Ticks % TimeSpan.TicksPerSecond;
+            return dateTimeOffset.Subtract(TimeSpan.FromTicks(ticksToRemove));
         }
     }
 }
